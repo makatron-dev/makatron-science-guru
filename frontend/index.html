@@ -2,12 +2,39 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#00d4ff" />
+    
+    <!-- PWA Manifest & Icons -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    
+    <title>MAKAVERSE EdTech | Premium CBT Platform</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- Register Service Worker ONLY in production -->
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+          
+          if (!isLocalhost) {
+            navigator.serviceWorker.register("/sw.js")
+              .then((registration) => {
+                console.log("PWA Service Worker registered:", registration);
+              })
+              .catch((registrationError) => {
+                console.log("PWA Service Worker registration failed:", registrationError);
+              });
+          } else {
+            console.log("Localhost detected: Skipping Service Worker registration to allow live code updates.");
+          }
+        });
+      }
+    </script>
   </body>
 </html>

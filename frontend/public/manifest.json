@@ -1,0 +1,18 @@
+{
+  "name": "MAKAVERSE EdTech",
+  "short_name": "MAKAVERSE",
+  "description": "The ultimate CBT preparation platform for Nigerian science students.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a1622",
+  "theme_color": "#00d4ff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}

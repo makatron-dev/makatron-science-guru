@@ -1,4 +1,4 @@
-﻿from database import SessionLocal
+from database import SessionLocal
 import models
 from auth import hash_password
 
@@ -12,7 +12,8 @@ else:
         display_name="Admin",
         password_hash=hash_password("changeme123"),
         school_name="Makatron",
-        class_level="SS3",
+        education_level="senior",
+        exam_target="jamb",
         subjects=["biology", "chemistry", "physics"],
         avatar_id="default",
         is_active=True,
@@ -20,5 +21,5 @@ else:
     )
     db.add(admin)
     db.commit()
-    print("Admin created: MSG-ADMIN1 / changeme123 — CHANGE THIS PASSWORD")
+    print("Admin created: MSG-ADMIN1 / changeme123")
 db.close()
