@@ -1,3 +1,6 @@
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, getToken } from "../api.js";
@@ -81,6 +84,7 @@ export default function AdminPage() {
             <SidebarItem icon="🗂️" label="Staging Area" active={view === "staging"} onClick={() => { setView("staging"); setSidebarOpen(false); }} />
             <SidebarItem icon="⚙️" label="Exam Rules & Config" active={view === "config"} onClick={() => { setView("config"); setSidebarOpen(false); }} />
             <SidebarItem icon="🎥" label="Live Classes" active={view === "zoom"} onClick={() => { setView("zoom"); setSidebarOpen(false); }} />
+            <SidebarItem icon="📊" label="Exam Results" active={view === "results"} onClick={() => { setView("results"); setSidebarOpen(false); }} />
             
             <div className="text-faint" style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", padding: "0 24px", marginTop: 24, marginBottom: 12 }}>Users</div>
             <SidebarItem icon="👥" label="Student Directory" active={view === "students"} onClick={() => { setView("students"); setSidebarOpen(false); }} />
@@ -138,6 +142,7 @@ export default function AdminPage() {
               {view === "difficulty" && <DifficultyCalibration />}
               {view === "exams" && <ExamCenter />}
               {view === "bank" && <QuestionBank />}
+              {view === "results" && <ResultsCenter />}
               {view === "passages" && <PassageManager />}
               {view === "library" && <LibraryManager />}
               {view === "staging" && <StagingArea />}
@@ -2807,6 +2812,203 @@ function AddQuestionPage({ exam, onBack, onSaved }) {
         {err && <p style={{ color: "var(--mk-danger)", marginBottom: 12, fontWeight: 600 }}>{err}</p>}
         <button type="submit" disabled={busy}>{busy ? "Saving..." : "Save Question"}</button>
       </form>
+    </div>
+  );
+}
+// ---------------- 17. RESULTS CENTER ----------------
+function ResultsCenter() {
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Filters
+  const [mode, setMode] = useState("");
+  const [level, setLevel] = useState("");
+  const [stateFilter, setStateFilter] = useState("");
+  const [days, setDays] = useState("");
+
+  function loadResults() {
+    setLoading(true);
+    const query = {};
+    if (mode) query.mode = mode;
+    if (level) query.education_level = level;
+    if (stateFilter) query.state = stateFilter;
+    if (days) query.days = days;
+
+    api.adminGetResults(query)
+      .then(setResults)
+      .catch((err) => alert("Error loading results: " + err.message))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadResults();
+  }, [mode, level, stateFilter, days]);
+
+  const formatTime = (seconds) => {
+    if (!seconds) return "—";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}m ${s}s`;
+  };
+
+  const exportExcel = () => {
+    const dataToExport = results.map((r, i) => ({
+      "S/N": i + 1,
+      "Student Name": r.student_name,
+      "School": r.school_name,
+      "State": r.state,
+      "Subject": SUBJECT_LABELS[r.subject] || r.subject,
+      "Exam Type": r.mode.toUpperCase(),
+      "Score": r.score,
+      "Total Questions": r.total_questions,
+      "Percentage (%)": r.percentage,
+      "Time Spent": formatTime(r.time_taken_seconds),
+      "Date Submitted": r.date ? new Date(r.date).toLocaleString() : "—"
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Exam Results");
+    XLSX.writeFile(wb, `MAKAVERSE_Results_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const exportPDF = () => {
+    const doc = new jsPDF('landscape');
+    doc.text("MAKAVERSE EXAMINATION RESULTS", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
+
+    const tableColumn = ["#", "Student Name", "School", "Subject", "Exam", "Score", "Total", "Percent", "Time", "Date"];
+    const tableRows = results.map((r, i) => [
+      i + 1,
+      r.student_name,
+      r.school_name,
+      SUBJECT_LABELS[r.subject] || r.subject,
+      r.mode.toUpperCase(),
+      r.score,
+      r.total_questions,
+      `${r.percentage}%`,
+      formatTime(r.time_taken_seconds),
+      r.date ? new Date(r.date).toLocaleDateString() : "—"
+    ]);
+
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 30,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [0, 212, 255] }
+    });
+
+    doc.save(`MAKAVERSE_Results_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  // Nigerian States for the dropdown
+  const statesList = ["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"];
+
+  return (
+    <div className="stack">
+      <div className="row-between" style={{ flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <h1 style={{ margin: 0 }}>Exam Results Center</h1>
+          <p className="text-dim" style={{ margin: "4px 0 0 0" }}>Track, filter, and export all student results.</p>
+        </div>
+        <div className="row" style={{ gap: 12 }}>
+          <button onClick={exportExcel} className="secondary" style={{ borderColor: "var(--mk-success)", color: "var(--mk-success)" }}>
+            📥 Export to Excel
+          </button>
+          <button onClick={exportPDF} style={{ background: "var(--mk-danger)", color: "white" }}>
+            📄 Download PDF
+          </button>
+        </div>
+      </div>
+
+      {/* FILTERS */}
+      <div className="card" style={{ padding: 24, background: "var(--mk-bg-elev-2)" }}>
+        <div className="form-grid-4">
+          <div>
+            <label>Exam Type</label>
+            <select value={mode} onChange={(e) => setMode(e.target.value)}>
+              <option value="">All Exams</option>
+              <option value="practice">Practice</option>
+              <option value="mock">Mock</option>
+              <option value="championship">Championship</option>
+            </select>
+          </div>
+          <div>
+            <label>Class Level</label>
+            <select value={level} onChange={(e) => setLevel(e.target.value)}>
+              <option value="">All Levels</option>
+              {EDUCATION_LEVELS.map(l => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
+            </select>
+          </div>
+          <div>
+            <label>State</label>
+            <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>
+              <option value="">All States</option>
+              {statesList.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label>Time Frame</label>
+            <select value={days} onChange={(e) => setDays(e.target.value)}>
+              <option value="">All Time</option>
+              <option value="1">Today</option>
+              <option value="7">Last 7 Days</option>
+              <option value="30">Last 30 Days</option>
+              <option value="90">Last 90 Days</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* RESULTS TABLE */}
+      <div className="card" style={{ padding: 0 }}>
+        <div className="table-responsive">
+          <table>
+            <thead>
+              <tr style={{ textAlign: "left", color: "var(--mk-text-faint)", fontSize: "0.75rem", textTransform: "uppercase", background: "var(--mk-bg-elev-2)" }}>
+                <th style={{ padding: "16px" }}>Student</th>
+                <th style={{ padding: "16px" }}>School / State</th>
+                <th style={{ padding: "16px" }}>Exam</th>
+                <th style={{ padding: "16px" }}>Score</th>
+                <th style={{ padding: "16px" }}>Percentage</th>
+                <th style={{ padding: "16px" }}>Time Spent</th>
+                <th style={{ padding: "16px" }}>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan="7" style={{ padding: 40, textAlign: "center" }} className="text-dim">Loading results...</td></tr>
+              ) : results.length === 0 ? (
+                <tr><td colSpan="7" style={{ padding: 40, textAlign: "center" }} className="text-dim">No results match your filters.</td></tr>
+              ) : results.map((r, i) => (
+                <tr key={i} style={{ borderTop: "1px solid var(--mk-border)" }}>
+                  <td style={{ padding: "16px", fontWeight: 700 }}>{r.student_name}</td>
+                  <td style={{ padding: "16px" }}>
+                    <div style={{ fontSize: "0.9rem" }}>{r.school_name}</div>
+                    <div className="text-faint" style={{ fontSize: "0.75rem" }}>{r.state}</div>
+                  </td>
+                  <td style={{ padding: "16px" }}>
+                    <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>{SUBJECT_LABELS[r.subject] || r.subject}</div>
+                    <span style={{ fontSize: "0.65rem", fontWeight: 800, padding: "2px 6px", borderRadius: 4, background: "rgba(0, 212, 255, 0.1)", color: "var(--mk-accent)" }}>{r.mode.toUpperCase()}</span>
+                  </td>
+                  <td style={{ padding: "16px", fontWeight: 800 }}>{r.score} / {r.total_questions}</td>
+                  <td style={{ padding: "16px" }}>
+                    <span style={{ fontWeight: 900, color: r.percentage >= 50 ? "var(--mk-success)" : "var(--mk-danger)" }}>
+                      {r.percentage}%
+                    </span>
+                  </td>
+                  <td style={{ padding: "16px" }} className="mono">{formatTime(r.time_taken_seconds)}</td>
+                  <td style={{ padding: "16px" }} className="text-dim">
+                    {r.date ? new Date(r.date).toLocaleDateString() : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

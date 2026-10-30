@@ -77,6 +77,7 @@ export const api = {
   getTicker: () => request("/ticker", { auth: false }),
 
   // Admin Master Control
+  adminGetResults: (query) => request("/admin/results", { query }),
   adminAnalytics: () => request("/admin/analytics"),
   adminGetDifficultyAnalytics: () => request("/admin/analytics/question-difficulty"),
   adminSettings: () => request("/admin/settings"),
