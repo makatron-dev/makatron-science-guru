@@ -40,13 +40,24 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Makatron CBT API", version="0.1.0")
 
+import os
+
+# ... (other imports)
+
+app = FastAPI(title="Makatron CBT API", version="0.1.0")
+
+# Get the frontend URL from Render environment variables
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
+        frontend_url,
     ],
+    allow_origin_regex=r"https://.*\.netlify\.app|https://.*\.vercel\.app", # Allows any Netlify/Vercel link
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
