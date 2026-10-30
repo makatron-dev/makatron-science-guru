@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, getToken } from "../api.js";
@@ -2872,8 +2872,11 @@ function ResultsCenter() {
     XLSX.writeFile(wb, `MAKAVERSE_Results_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const exportPDF = () => {
+    const exportPDF = () => {
     const doc = new jsPDF('landscape');
+    
+    // Add Title and Date
+    doc.setFontSize(16);
     doc.text("MAKAVERSE EXAMINATION RESULTS", 14, 15);
     doc.setFontSize(10);
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
@@ -2892,12 +2895,15 @@ function ResultsCenter() {
       r.date ? new Date(r.date).toLocaleDateString() : "—"
     ]);
 
-    doc.autoTable({
+    // Use the new explicit autoTable syntax
+    autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
       startY: 30,
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [0, 212, 255] }
+      headStyles: { fillColor: [0, 212, 255] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { top: 30 }
     });
 
     doc.save(`MAKAVERSE_Results_${new Date().toISOString().split('T')[0]}.pdf`);
