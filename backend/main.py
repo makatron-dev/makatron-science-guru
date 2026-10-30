@@ -1230,6 +1230,68 @@ def get_logs(db: Session = Depends(get_db), admin: models.User = Depends(require
     logs = db.query(models.ActivityLog).order_by(models.ActivityLog.created_at.desc()).limit(10).all()
     return [{"action": l.action_type, "msg": l.description, "time": l.created_at.isoformat()} for l in logs]
 
+@app.get("/admin/results")
+def admin_get_results(
+    db: Session = Depends(get_db), 
+    admin: models.User = Depends(require_admin),
+    mode: Optional[str] = None,
+    education_level: Optional[str] = None,
+    state: Optional[str] = None,
+    days: Optional[int] = None
+):
+    # Base Query: Join Test, User, and School
+    query = db.query(
+        models.Test.id,
+        models.Test.subject,
+        models.Test.mode,
+        models.Test.score,
+        models.Test.question_count,
+        models.Test.time_taken_seconds,
+        models.Test.submitted_at,
+        models.User.display_name,
+        models.User.school_name,
+        models.School.state
+    ).join(
+        models.User, models.Test.user_id == models.User.id
+    ).outerjoin(
+        models.School, models.User.school_id == models.School.id
+    ).filter(
+        models.Test.status == "submitted"
+    )
+
+    # Apply Filters
+    if mode:
+        query = query.filter(models.Test.mode == mode)
+    if education_level:
+        query = query.filter(models.Test.education_level == education_level)
+    if state:
+        query = query.filter(models.School.state == state)
+    if days:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        query = query.filter(models.Test.submitted_at >= cutoff)
+
+    # Execute and order by newest first
+    results = query.order_by(models.Test.submitted_at.desc()).limit(500).all()
+
+    out = []
+    for r in results:
+        # Calculate percentage safely
+        pct = round((r.score / r.question_count) * 100, 1) if r.question_count > 0 else 0
+        out.append({
+            "id": r.id,
+            "student_name": r.display_name,
+            "school_name": r.school_name or "Independent",
+            "state": r.state or "—",
+            "subject": r.subject,
+            "mode": r.mode,
+            "score": r.score,
+            "total_questions": r.question_count,
+            "percentage": pct,
+            "time_taken_seconds": r.time_taken_seconds,
+            "date": r.submitted_at.isoformat() if r.submitted_at else None
+        })
+    return out
+
 
 @app.post("/admin/notifications/send")
 def admin_send_notification(payload: dict, db: Session = Depends(get_db), admin: models.User = Depends(require_super_admin)):
