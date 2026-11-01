@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import ThemeToggle from "./ThemeToggle.jsx";
 import { useAuth } from "./AuthContext.jsx";
@@ -8,11 +8,27 @@ import BugReporter from "./components/BugReporter.jsx";
 
 const sectionTitleStyle = { fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", color: "var(--mk-text-faint)", padding: "0 24px", marginTop: 24, marginBottom: 12, letterSpacing: "1px" };
 
+const SidebarItem = ({ icon, label, active, onClick }) => (
+  <div
+    onClick={onClick}
+    style={{
+      display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", margin: "2px 12px",
+      borderRadius: "8px", color: active ? "var(--mk-accent)" : "var(--mk-text-dim)",
+      background: active ? "var(--mk-bg-elev-2)" : "transparent",
+      fontWeight: active ? 600 : 500, fontSize: "0.95rem", cursor: "pointer", transition: "all 0.2s"
+    }}
+  >
+    {icon && <span>{icon}</span>}
+    <span>{label}</span>
+  </div>
+);
+
 export default function PublicNav({ mobileOpen, closeMobile }) {
   const { user, logout, loading } = useAuth();
   const isAdmin = user && user.is_admin;
   const location = useLocation();
-  
+  const navigate = useNavigate();
+
   const [allowEdits, setAllowEdits] = useState(true);
   const [showBugReporter, setShowBugReporter] = useState(false);
 
@@ -29,12 +45,12 @@ export default function PublicNav({ mobileOpen, closeMobile }) {
   const isLinkActive = (path, exactQuery = null) => {
     const currentPath = location.pathname;
     const currentSearch = location.search;
-    
+
     if (path === "/dashboard") {
       if (exactQuery) return currentPath === "/dashboard" && currentSearch.includes(exactQuery);
       return currentPath === "/dashboard" && (!currentSearch || currentSearch === "");
     }
-    
+
     return currentPath === path;
   };
 
@@ -48,7 +64,7 @@ export default function PublicNav({ mobileOpen, closeMobile }) {
   return (
     <>
       <aside className={`public-sidebar ${mobileOpen ? "open" : ""}`}>
-        
+
         <div style={{ padding: "24px 20px", borderBottom: "1px solid var(--mk-border)" }}>
           <Logo size="sm" linkTo={user ? "/dashboard" : "/"} />
         </div>
@@ -83,7 +99,7 @@ export default function PublicNav({ mobileOpen, closeMobile }) {
                   ) : (
                     <>
                       <Link to="/dashboard" style={getLinkStyle(isLinkActive("/dashboard"))} onClick={closeMobile}>My Dashboard</Link>
-                      <SidebarItem icon="💳" label="Subscription" active={location.pathname === "/subscription"} onClick={() => navigate("/subscription")} />
+                      <SidebarItem icon="💳" label="Subscription" active={location.pathname === "/subscription"} onClick={() => { navigate("/subscription"); if (closeMobile) closeMobile(); }} />
                       <Link to="/dashboard?tab=school" style={getLinkStyle(isLinkActive("/dashboard", "tab=school"))} onClick={closeMobile}>🏫 My School</Link>
                       <Link to="/dashboard?tab=exams" style={getLinkStyle(isLinkActive("/dashboard", "tab=exams"))} onClick={closeMobile}>📝 Start Exam</Link>
                       <Link to="/arena" style={getLinkStyle(isLinkActive("/arena"))} onClick={closeMobile}>🏆 Championship Arena</Link>
@@ -111,11 +127,11 @@ export default function PublicNav({ mobileOpen, closeMobile }) {
                     <Link to="/dashboard?tab=profile" style={getLinkStyle(isLinkActive("/dashboard", "tab=profile"))} onClick={closeMobile}>⚙️ Edit Profile</Link>
                   )}
                   {!isAdmin && <Link to="/support" style={getLinkStyle(isLinkActive("/support"))} onClick={closeMobile}>Contact Support</Link>}
-                  
+
                   {/* BUG REPORTER BUTTON */}
                   {!isAdmin && (
-                    <div 
-                      onClick={() => { setShowBugReporter(true); if (closeMobile) closeMobile(); }} 
+                    <div
+                      onClick={() => { setShowBugReporter(true); if (closeMobile) closeMobile(); }}
                       style={{ ...getLinkStyle(false), cursor: "pointer" }}
                     >
                       🐛 Report a Bug
