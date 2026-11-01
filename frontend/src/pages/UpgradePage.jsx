@@ -48,6 +48,7 @@ export default function UpgradePage() {
     try {
       const res = await api.initPayment("monthly");
 
+      // Handle fallback to redirect if Paystack key is missing or script fails
       if (!res || !res.ok) {
         throw new Error("Payment initialization failed.");
       }
@@ -64,11 +65,14 @@ export default function UpgradePage() {
         throw new Error("Please add an email to your profile before upgrading.");
       }
 
-      const handler = window.PaystackPop.setup({
+      // V2 Implementation
+      const popup = new window.PaystackPop();
+      
+      popup.newTransaction({
         key: PAYSTACK_PUBLIC_KEY,
         email: user.email,
-        amount: 500000,
-        ref: res.reference,
+        amount: 500000, // Amount in kobo (5,000 NGN)
+        reference: res.reference, // V2 uses 'reference' instead of 'ref'
         metadata: {
           user_id: user.id,
           plan_type: "monthly",
@@ -89,8 +93,7 @@ export default function UpgradePage() {
           setBusy(false);
         },
       });
-
-      handler.openIframe();
+      
     } catch (err) {
       setError(err.message || "Payment could not be started.");
       setBusy(false);
