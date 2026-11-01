@@ -26,6 +26,7 @@ import VaultPage from "./pages/VaultPage.jsx";
 import LibraryPage from "./pages/LibraryPage.jsx";
 import CollectionPage from "./pages/CollectionPage.jsx";
 import UpgradePage from "./pages/UpgradePage.jsx";
+import SubscriptionPage from "./pages/SubscriptionPage.jsx";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -79,6 +80,7 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/test/:id/result" element={<Protected><TestResultPage /></Protected>} />
         <Route path="/test/:subject/:mode" element={<Protected><TestPage /></Protected>} />
+        <Route path="/subscription" element={<Protected><SubscriptionPage /></Protected>} />
       </Routes>
     );
   }

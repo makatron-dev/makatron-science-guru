@@ -75,7 +75,7 @@ export default function AdminPage() {
             <SidebarItem icon="📊" label="Dashboard" active={view === "dashboard"} onClick={() => { setView("dashboard"); setSidebarOpen(false); }} />
             <SidebarItem icon="📈" label="Analytics" active={view === "analytics"} onClick={() => { setView("analytics"); setSidebarOpen(false); }} />
             <SidebarItem icon="🎯" label="Difficulty Calibration" active={view === "difficulty"} onClick={() => { setView("difficulty"); setSidebarOpen(false); }} />
-            
+
             <div className="text-faint" style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", padding: "0 24px", marginTop: 24, marginBottom: 12 }}>Academics</div>
             <SidebarItem icon="📝" label="Exam Center" active={view === "exams"} onClick={() => { setView("exams"); setSidebarOpen(false); }} />
             <SidebarItem icon="📚" label="Question Bank" active={view === "bank"} onClick={() => { setView("bank"); setSidebarOpen(false); }} />
@@ -94,6 +94,8 @@ export default function AdminPage() {
             
             <div className="text-faint" style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", padding: "0 24px", marginTop: 24, marginBottom: 12 }}>System</div>
             
+            <SidebarItem icon="📋" label="Subscription Logs" active={view === "sub_logs"} onClick={() => { setView("sub_logs"); setSidebarOpen(false); }} />
+
             <div onClick={() => { setView("inbox"); setSidebarOpen(false); }} className={`admin-sidebar-item ${view === "inbox" ? 'active' : ''}`} style={{ padding: "10px 24px", margin: "2px 0", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", background: view === "inbox" ? "var(--mk-bg-elev-2)" : "transparent", color: view === "inbox" ? "var(--mk-accent)" : "var(--mk-text-dim)", borderLeft: view === "inbox" ? "3px solid var(--mk-accent)" : "3px solid transparent" }}>
               <div style={{ display: "flex", alignItems: "center" }}>
                 <span style={{ marginRight: 12, fontSize: "1.1rem" }}>{unreadCount > 0 ? "✉️" : "📖"}</span>
@@ -140,6 +142,7 @@ export default function AdminPage() {
               {view === "dashboard" && <DashboardOverview stats={stats} onNavigate={setView} />}
               {view === "analytics" && <AnalyticsCenter />}
               {view === "difficulty" && <DifficultyCalibration />}
+              {view === "sub_logs" && <SubscriptionLogs />}
               {view === "exams" && <ExamCenter />}
               {view === "bank" && <QuestionBank />}
               {view === "results" && <ResultsCenter />}
@@ -2815,6 +2818,7 @@ function AddQuestionPage({ exam, onBack, onSaved }) {
     </div>
   );
 }
+
 // ---------------- 17. RESULTS CENTER ----------------
 function ResultsCenter() {
   const [results, setResults] = useState([]);
@@ -2824,7 +2828,8 @@ function ResultsCenter() {
   const [mode, setMode] = useState("");
   const [level, setLevel] = useState("");
   const [stateFilter, setStateFilter] = useState("");
-  const [days, setDays] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   function loadResults() {
     setLoading(true);
@@ -2832,7 +2837,8 @@ function ResultsCenter() {
     if (mode) query.mode = mode;
     if (level) query.education_level = level;
     if (stateFilter) query.state = stateFilter;
-    if (days) query.days = days;
+    if (startDate) query.start_date = startDate;
+    if (endDate) query.end_date = endDate;
 
     api.adminGetResults(query)
       .then(setResults)
@@ -2842,7 +2848,7 @@ function ResultsCenter() {
 
   useEffect(() => {
     loadResults();
-  }, [mode, level, stateFilter, days]);
+  }, [mode, level, stateFilter, startDate, endDate]);
 
   const formatTime = (seconds) => {
     if (!seconds) return "—";
@@ -2872,7 +2878,7 @@ function ResultsCenter() {
     XLSX.writeFile(wb, `MAKAVERSE_Results_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-    const exportPDF = () => {
+  const exportPDF = () => {
     const doc = new jsPDF('landscape');
     
     // Add Title and Date
@@ -2956,15 +2962,20 @@ function ResultsCenter() {
             </select>
           </div>
           <div>
-            <label>Time Frame</label>
-            <select value={days} onChange={(e) => setDays(e.target.value)}>
-              <option value="">All Time</option>
-              <option value="1">Today</option>
-              <option value="7">Last 7 Days</option>
-              <option value="30">Last 30 Days</option>
-              <option value="90">Last 90 Days</option>
-            </select>
+            <label>From Date</label>
+            <input type="date" value={startDate} max={endDate || undefined} onChange={(e) => setStartDate(e.target.value)} />
           </div>
+          <div>
+            <label>To Date</label>
+            <input type="date" value={endDate} min={startDate || undefined} onChange={(e) => setEndDate(e.target.value)} />
+          </div>
+          {(startDate || endDate) && (
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <button className="secondary" onClick={() => { setStartDate(""); setEndDate(""); }} style={{ width: "100%" }}>
+                ✕ Clear Dates
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -3008,6 +3019,65 @@ function ResultsCenter() {
                   <td style={{ padding: "16px" }} className="mono">{formatTime(r.time_taken_seconds)}</td>
                   <td style={{ padding: "16px" }} className="text-dim">
                     {r.date ? new Date(r.date).toLocaleDateString() : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------- 18. SUBSCRIPTION LOGS ----------------
+function SubscriptionLogs() {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.adminSubscriptionLogs().then(setLogs).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="stack">
+      <div>
+        <h1 style={{ margin: 0 }}>Subscription Logs</h1>
+        <p className="text-dim" style={{ margin: "4px 0 0 0" }}>Track all student trials, premium upgrades, and expiry dates.</p>
+      </div>
+
+      <div className="card" style={{ padding: 0 }}>
+        <div className="table-responsive">
+          <table>
+            <thead>
+              <tr style={{ textAlign: "left", color: "var(--mk-text-faint)", fontSize: "0.75rem", textTransform: "uppercase", background: "var(--mk-bg-elev-2)" }}>
+                <th style={{ padding: "16px" }}>Student</th>
+                <th style={{ padding: "16px" }}>Joined</th>
+                <th style={{ padding: "16px" }}>Status</th>
+                <th style={{ padding: "16px" }}>Trial Ends</th>
+                <th style={{ padding: "16px" }}>Premium Expiry</th>
+                <th style={{ padding: "16px" }}>Last Payment</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan="6" style={{ padding: 40, textAlign: "center" }} className="text-dim">Loading...</td></tr>
+              ) : logs.map((l, i) => (
+                <tr key={i} style={{ borderTop: "1px solid var(--mk-border)" }}>
+                  <td style={{ padding: "16px" }}>
+                    <div style={{ fontWeight: 700 }}>{l.display_name}</div>
+                    <div className="text-faint" style={{ fontSize: "0.8rem" }}>@{l.username}</div>
+                  </td>
+                  <td style={{ padding: "16px" }} className="text-dim">{l.date_joined ? new Date(l.date_joined).toLocaleDateString() : "—"}</td>
+                  <td style={{ padding: "16px" }}>
+                    <span style={{ padding: "4px 8px", borderRadius: 4, fontSize: "0.75rem", fontWeight: 800, background: l.is_premium ? "rgba(251, 191, 36, 0.1)" : "rgba(0, 212, 255, 0.1)", color: l.is_premium ? "var(--mk-warning)" : "var(--mk-accent)" }}>
+                      {l.is_premium ? "PREMIUM" : "FREE/TRIAL"}
+                    </span>
+                  </td>
+                  <td style={{ padding: "16px" }} className="text-dim">{l.trial_ends_at ? new Date(l.trial_ends_at).toLocaleDateString() : "—"}</td>
+                  <td style={{ padding: "16px", fontWeight: 700, color: "var(--mk-warning)" }}>{l.premium_expires_at ? new Date(l.premium_expires_at).toLocaleDateString() : "—"}</td>
+                  <td style={{ padding: "16px" }} className="text-dim">
+                    {l.last_payment_date ? `${new Date(l.last_payment_date).toLocaleDateString()} (₦${l.last_payment_amount?.toLocaleString()})` : "—"}
                   </td>
                 </tr>
               ))}

@@ -83,6 +83,7 @@ export default function PublicNav({ mobileOpen, closeMobile }) {
                   ) : (
                     <>
                       <Link to="/dashboard" style={getLinkStyle(isLinkActive("/dashboard"))} onClick={closeMobile}>My Dashboard</Link>
+                      <SidebarItem icon="💳" label="Subscription" active={location.pathname === "/subscription"} onClick={() => navigate("/subscription")} />
                       <Link to="/dashboard?tab=school" style={getLinkStyle(isLinkActive("/dashboard", "tab=school"))} onClick={closeMobile}>🏫 My School</Link>
                       <Link to="/dashboard?tab=exams" style={getLinkStyle(isLinkActive("/dashboard", "tab=exams"))} onClick={closeMobile}>📝 Start Exam</Link>
                       <Link to="/arena" style={getLinkStyle(isLinkActive("/arena"))} onClick={closeMobile}>🏆 Championship Arena</Link>

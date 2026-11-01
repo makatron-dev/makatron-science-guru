@@ -83,6 +83,7 @@ export const api = {
   adminSettings: () => request("/admin/settings"),
   adminUpdateSettings: (p) => request("/admin/settings", { method: "PUT", body: p }),
   adminLogs: () => request("/admin/logs"),
+  adminSubscriptionLogs: () => request("/admin/subscription-logs"),
 
   // Schools (Admin)
   adminCreateSchool: (p) => request("/admin/schools", { method: "POST", body: p }),

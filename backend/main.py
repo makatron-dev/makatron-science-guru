@@ -97,7 +97,7 @@ def check_trial_access(user: models.User):
             raise HTTPException(403, "Your premium subscription has expired. Please renew.")
         return True
     if user.trial_ends_at and user.trial_ends_at < datetime.now(timezone.utc):
-        raise HTTPException(403, "Your 7-day free trial has ended. Please upgrade to Premium.")
+        raise HTTPException(403, "Your 3-day free trial has ended. Please upgrade to Premium.")
     return True
 
 
@@ -183,7 +183,7 @@ def cron_send_notifications():
             try:
                 email_service.send_support_email(
                     u.display_name, u.email,
-                    "⏳ Your 7-day MAKAVERSE Premium trial ends tomorrow. Upgrade to keep full access."
+                    "⏳ Your 3-day MAKAVERSE Premium trial ends tomorrow. Upgrade to keep full access."
                 )
             except Exception:
                 pass
@@ -314,7 +314,7 @@ def register(payload: RegisterRequest, background_tasks: BackgroundTasks, db: Se
         if referrer:
             referred_by_id = referrer.id
 
-    trial_end = datetime.now(timezone.utc) + timedelta(days=7)
+    trial_end = datetime.now(timezone.utc) + timedelta(days=3)
 
     user = models.User(
         username=username,
@@ -1289,6 +1289,33 @@ def admin_get_results(
             "percentage": pct,
             "time_taken_seconds": r.time_taken_seconds,
             "date": r.submitted_at.isoformat() if r.submitted_at else None
+        })
+    return out
+
+@app.get("/admin/subscription-logs")
+def admin_subscription_logs(db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
+    users = db.query(models.User).filter(models.User.is_admin == False).order_by(models.User.created_at.desc()).all()
+    
+    out = []
+    for u in users:
+        # Find the most recent successful transaction
+        last_txn = db.query(models.Transaction).filter(
+            models.Transaction.user_id == u.id, 
+            models.Transaction.status == "success"
+        ).order_by(models.Transaction.paid_at.desc()).first()
+
+        out.append({
+            "id": u.id,
+            "display_name": u.display_name,
+            "username": u.username,
+            "school_name": u.school_name or "Independent",
+            "education_level": u.education_level,
+            "date_joined": u.created_at.isoformat() if u.created_at else None,
+            "trial_ends_at": u.trial_ends_at.isoformat() if u.trial_ends_at else None,
+            "is_premium": u.is_premium,
+            "premium_expires_at": u.premium_expires_at.isoformat() if u.premium_expires_at else None,
+            "last_payment_date": last_txn.paid_at.isoformat() if last_txn else None,
+            "last_payment_amount": last_txn.amount if last_txn else None,
         })
     return out
 
