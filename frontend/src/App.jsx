@@ -50,7 +50,7 @@ function AppRoutes() {
   
   const isAdminRoute = location.pathname.startsWith("/admin");
   
-  // FIXED: Added "/terms" so the Terms page opens as a clean full-width page
+  // FIXED: Added "/subscription" so it opens as a clean full-width page
   const isFullWidthRoute = 
     location.pathname === "/" || 
     location.pathname === "/login" || 
@@ -58,6 +58,7 @@ function AppRoutes() {
     location.pathname === "/terms" ||
     location.pathname === "/forgot-password" ||
     location.pathname === "/reset-password" ||
+    location.pathname === "/subscription" ||
     location.pathname.startsWith("/test/");
 
   if (isAdminRoute) {
@@ -111,6 +112,10 @@ function AppRoutes() {
             <Route path="/library" element={<Protected><LibraryPage /></Protected>} />
             <Route path="/collection" element={<Protected><CollectionPage /></Protected>} />
             <Route path="/upgrade" element={<Protected><UpgradePage /></Protected>} />
+            
+            {/* Added here just in case you ever want it with the sidebar layout */}
+            <Route path="/subscription" element={<Protected><SubscriptionPage /></Protected>} />
+            
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
