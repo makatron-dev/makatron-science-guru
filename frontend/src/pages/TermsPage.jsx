@@ -26,7 +26,7 @@ export default function TermsPage() {
         <section>
           <h3 style={{ color: "var(--mk-accent)", marginBottom: 8 }}>3. Free Trial & Premium Upgrades</h3>
           <p className="text-dim">
-            New accounts are granted a 7-day free trial with limited access. After the trial ends, access to advanced features (Mocks, AI Tutor, Arena) requires a Premium upgrade. Premium payments are handled securely via Paystack. <strong>All payments are final and non-refundable</strong> unless required by law.
+            New accounts are granted a 3-day free trial with limited access. After the trial ends, access to advanced features (Mocks, AI Tutor, Arena) requires a Premium upgrade. Premium payments are handled securely via Paystack. <strong>All payments are final and non-refundable</strong> unless required by law.
           </p>
         </section>
 

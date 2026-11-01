@@ -333,7 +333,7 @@ def register(payload: RegisterRequest, background_tasks: BackgroundTasks, db: Se
         trial_ends_at=trial_end
     )
     db.add(user); db.commit(); db.refresh(user)
-    log_activity(db, "USER_REGISTERED", f"New student: {user.display_name} (7-Day Trial Started)")
+    log_activity(db, "USER_REGISTERED", f"New student: {user.display_name} (3-Day Trial Started)")
 
     referral_bonus = 0
     if referrer:
