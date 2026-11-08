@@ -168,6 +168,26 @@ export default function AdminPage() {
   );
 }
 
+// Global ImageKit Upload Helper
+async function uploadToImageKit(file) {
+  const auth = await api.getImageKitAuth();
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("publicKey", auth.publicKey);
+  formData.append("signature", auth.signature);
+  formData.append("expire", auth.expire);
+  formData.append("token", auth.token);
+  formData.append("fileName", file.name);
+
+  const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Image upload failed");
+  return data.url;
+}
+
 function SidebarItem({ icon, label, active, onClick }) {
   return (
     <div onClick={onClick} className={`admin-sidebar-item ${active ? 'active' : ''}`} style={{ padding: "10px 24px", margin: "2px 0", display: "flex", alignItems: "center", cursor: "pointer", background: active ? "var(--mk-bg-elev-2)" : "transparent", color: active ? "var(--mk-accent)" : "var(--mk-text-dim)", borderLeft: active ? "3px solid var(--mk-accent)" : "3px solid transparent" }}>
@@ -986,7 +1006,6 @@ function StudentsCenter({ onRefresh }) {
     if (!window.confirm(`Are you absolutely sure you want to delete ${selectedIds.length} students? This will also delete all their test history. This cannot be undone.`)) return;
     setBusy(true);
     try {
-      // FIXED: Changed from DELETE to POST to ensure the body is sent properly across all browsers.
       const token = getToken();
       const res = await fetch(`${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/admin/students/bulk-delete`, {
         method: "POST",
@@ -2435,6 +2454,39 @@ function ExamBuilder({ exam, onBack, onAddQuestion, onUpdateExam }) {
     setSavingSettings(false);
   }
 
+  function downloadExcelTemplate() {
+    const headers = [
+      "question_text", 
+      "option_a", 
+      "option_b", 
+      "option_c", 
+      "option_d", 
+      "correct_option", 
+      "explanation", 
+      "topic", 
+      "difficulty", 
+      "image_url"
+    ];
+
+    const sampleRow = {
+      question_text: "What is the chemical symbol for water?",
+      option_a: "H2O",
+      option_b: "CO2",
+      option_c: "O2",
+      option_d: "NaCl",
+      correct_option: "A",
+      explanation: "Water is composed of two hydrogen atoms and one oxygen atom.",
+      topic: "Chemical Symbols",
+      difficulty: "easy",
+      image_url: ""
+    };
+
+    const ws = XLSX.utils.json_to_sheet([sampleRow], { header: headers });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Questions_Template");
+    XLSX.writeFile(wb, `Template_${exam.title.replace(/[^a-z0-9]/gi, '_')}.xlsx`);
+  }
+
   function openEditModal(q) {
     setEditingQuestion(q);
     setEditError("");
@@ -2452,13 +2504,13 @@ function ExamBuilder({ exam, onBack, onAddQuestion, onUpdateExam }) {
       passage_id: q.passage_id || "",
     });
   }
-
+  
   function closeEditModal() {
     setEditingQuestion(null);
     setEditForm(null);
     setEditError("");
   }
-
+  
   async function saveEdit(e) {
     e.preventDefault();
     if (!editingQuestion || !editForm) return;
@@ -2506,7 +2558,12 @@ function ExamBuilder({ exam, onBack, onAddQuestion, onUpdateExam }) {
       {activeTab === "questions" && (
         <div>
           <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
-            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="secondary">📥 {uploading ? "Importing..." : "Import CSV"}</button>
+            <button onClick={downloadExcelTemplate} className="secondary" style={{ borderColor: "var(--mk-success)", color: "var(--mk-success)" }}>
+              📊 Download Excel Template
+            </button>
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="secondary">
+              📥 {uploading ? "Importing..." : "Import CSV / XLSX"}
+            </button>
             <input type="file" accept=".csv, .xlsx" ref={fileInputRef} onChange={handleFileSelected} style={{ display: "none" }} />
             <button onClick={onAddQuestion}>+ Add Question</button>
           </div>
@@ -2676,6 +2733,30 @@ function ExamBuilder({ exam, onBack, onAddQuestion, onUpdateExam }) {
                 <div>
                   <label>Image URL (Optional)</label>
                   <input value={editForm.image_url} onChange={e => setEditForm({ ...editForm, image_url: e.target.value })} placeholder="https://..." />
+                  <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 16 }}>
+                    <label style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", background: "var(--mk-bg-elev-2)", border: "1px solid var(--mk-border-strong)", borderRadius: "var(--mk-radius)", fontSize: "0.85rem", fontWeight: 600, color: "var(--mk-text)" }}>
+                      <span>📤</span> {editBusy ? "Uploading..." : "Upload Image"}
+                      <input type="file" accept="image/*" disabled={editBusy} style={{ display: "none" }} onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        setEditBusy(true); setEditError("");
+                        try {
+                          const url = await uploadToImageKit(file);
+                          setEditForm(prev => ({ ...prev, image_url: url }));
+                        } catch (ex) {
+                          setEditError("Image upload failed: " + ex.message);
+                        }
+                        setEditBusy(false);
+                        e.target.value = null;
+                      }} />
+                    </label>
+                    {editForm.image_url && (
+                      <div style={{ position: "relative", display: "inline-block" }}>
+                        <img src={editForm.image_url} alt="Preview" style={{ height: 60, width: 100, objectFit: "cover", borderRadius: 8, border: "1px solid var(--mk-border)" }} />
+                        <button type="button" onClick={() => setEditForm({ ...editForm, image_url: "" })} style={{ position: "absolute", top: -6, right: -6, background: "var(--mk-danger)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "0.6rem", padding: 0 }}>✕</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label>Passage ID (Optional)</label>
@@ -2724,7 +2805,6 @@ function ExamBuilder({ exam, onBack, onAddQuestion, onUpdateExam }) {
   );
 }
 
-// ---------------- 14. ADD QUESTION PAGE ----------------
 function AddQuestionPage({ exam, onBack, onSaved }) {
   const [form, setForm] = useState({
     question_text: "",
@@ -2740,15 +2820,27 @@ function AddQuestionPage({ exam, onBack, onSaved }) {
     passage_id: "",
   });
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
+
+  async function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true); setErr("");
+    try {
+      const url = await uploadToImageKit(file);
+      setForm(prev => ({ ...prev, image_url: url }));
+    } catch (ex) {
+      setErr("Image upload failed: " + ex.message);
+    }
+    setUploading(false);
+    e.target.value = null;
+  }
 
   async function save(e) {
     e.preventDefault();
     setBusy(true); setErr("");
     try {
-      // The backend exposes CSV upload as the sanctioned create path.
-      // We build a single-row CSV in memory and send it through adminUploadCsv
-      // so this form still works without needing a dedicated POST /admin/questions endpoint.
       const escape = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
       const header = "question_text,option_a,option_b,option_c,option_d,correct_option,explanation,topic,difficulty,image_url";
       const row = [
@@ -2805,6 +2897,18 @@ function AddQuestionPage({ exam, onBack, onSaved }) {
           <div>
             <label>Image URL (Optional - for diagrams)</label>
             <input value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} placeholder="https://..." />
+            <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 16 }}>
+              <label style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", background: "var(--mk-bg-elev-2)", border: "1px solid var(--mk-border-strong)", borderRadius: "var(--mk-radius)", fontSize: "0.85rem", fontWeight: 600, color: "var(--mk-text)" }}>
+                <span>📤</span> {uploading ? "Uploading..." : "Upload Image"}
+                <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploading} style={{ display: "none" }} />
+              </label>
+              {form.image_url && (
+                <div style={{ position: "relative", display: "inline-block" }}>
+                  <img src={form.image_url} alt="Preview" style={{ height: 60, width: 100, objectFit: "cover", borderRadius: 8, border: "1px solid var(--mk-border)" }} />
+                  <button type="button" onClick={() => setForm({ ...form, image_url: "" })} style={{ position: "absolute", top: -6, right: -6, background: "var(--mk-danger)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "0.6rem", padding: 0 }}>✕</button>
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <label>Passage ID (Optional)</label>
@@ -2831,14 +2935,13 @@ function ResultsCenter() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  // Fetch WITHOUT date filtering (server-side filters for mode/level/state still apply)
   function loadResults() {
     setLoading(true);
     const query = {};
     if (mode) query.mode = mode;
     if (level) query.education_level = level;
     if (stateFilter) query.state = stateFilter;
-    if (startDate) query.start_date = startDate;
-    if (endDate) query.end_date = endDate;
 
     api.adminGetResults(query)
       .then(setResults)
@@ -2848,7 +2951,24 @@ function ResultsCenter() {
 
   useEffect(() => {
     loadResults();
-  }, [mode, level, stateFilter, startDate, endDate]);
+  }, [mode, level, stateFilter]);
+
+  // Apply date filtering client-side for guaranteed accuracy
+  const filteredResults = results.filter((r) => {
+    if (!r.date) return !startDate && !endDate;
+    const d = new Date(r.date);
+    if (isNaN(d.getTime())) return true;
+
+    if (startDate) {
+      const start = new Date(startDate + "T00:00:00");
+      if (d < start) return false;
+    }
+    if (endDate) {
+      const end = new Date(endDate + "T23:59:59.999");
+      if (d > end) return false;
+    }
+    return true;
+  });
 
   const formatTime = (seconds) => {
     if (!seconds) return "—";
@@ -2858,10 +2978,10 @@ function ResultsCenter() {
   };
 
   const exportExcel = () => {
-    const dataToExport = results.map((r, i) => ({
+    const dataToExport = filteredResults.map((r, i) => ({
       "S/N": i + 1,
       "Student Name": r.student_name,
-      "School": r.school_name,
+      "School": (r.school_name && r.school_name !== "Independent") ? r.school_name : "—",
       "State": r.state,
       "Subject": SUBJECT_LABELS[r.subject] || r.subject,
       "Exam Type": r.mode.toUpperCase(),
@@ -2880,18 +3000,16 @@ function ResultsCenter() {
 
   const exportPDF = () => {
     const doc = new jsPDF('landscape');
-    
-    // Add Title and Date
     doc.setFontSize(16);
     doc.text("MAKAVERSE EXAMINATION RESULTS", 14, 15);
     doc.setFontSize(10);
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
 
     const tableColumn = ["#", "Student Name", "School", "Subject", "Exam", "Score", "Total", "Percent", "Time", "Date"];
-    const tableRows = results.map((r, i) => [
+    const tableRows = filteredResults.map((r, i) => [
       i + 1,
       r.student_name,
-      r.school_name,
+      (r.school_name && r.school_name !== "Independent") ? r.school_name : "—",
       SUBJECT_LABELS[r.subject] || r.subject,
       r.mode.toUpperCase(),
       r.score,
@@ -2901,7 +3019,6 @@ function ResultsCenter() {
       r.date ? new Date(r.date).toLocaleDateString() : "—"
     ]);
 
-    // Use the new explicit autoTable syntax
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
@@ -2915,7 +3032,6 @@ function ResultsCenter() {
     doc.save(`MAKAVERSE_Results_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
-  // Nigerian States for the dropdown
   const statesList = ["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"];
 
   return (
@@ -2935,7 +3051,6 @@ function ResultsCenter() {
         </div>
       </div>
 
-      {/* FILTERS */}
       <div className="card" style={{ padding: 24, background: "var(--mk-bg-elev-2)" }}>
         <div className="form-grid-4">
           <div>
@@ -2979,7 +3094,6 @@ function ResultsCenter() {
         </div>
       </div>
 
-      {/* RESULTS TABLE */}
       <div className="card" style={{ padding: 0 }}>
         <div className="table-responsive">
           <table>
@@ -2997,13 +3111,13 @@ function ResultsCenter() {
             <tbody>
               {loading ? (
                 <tr><td colSpan="7" style={{ padding: 40, textAlign: "center" }} className="text-dim">Loading results...</td></tr>
-              ) : results.length === 0 ? (
+              ) : filteredResults.length === 0 ? (
                 <tr><td colSpan="7" style={{ padding: 40, textAlign: "center" }} className="text-dim">No results match your filters.</td></tr>
-              ) : results.map((r, i) => (
+              ) : filteredResults.map((r, i) => (
                 <tr key={i} style={{ borderTop: "1px solid var(--mk-border)" }}>
                   <td style={{ padding: "16px", fontWeight: 700 }}>{r.student_name}</td>
                   <td style={{ padding: "16px" }}>
-                    <div style={{ fontSize: "0.9rem" }}>{r.school_name}</div>
+                    <div style={{ fontSize: "0.9rem" }}>{(r.school_name && r.school_name !== "Independent") ? r.school_name : "—"}</div>
                     <div className="text-faint" style={{ fontSize: "0.75rem" }}>{r.state}</div>
                   </td>
                   <td style={{ padding: "16px" }}>
@@ -3029,7 +3143,6 @@ function ResultsCenter() {
     </div>
   );
 }
-
 // ---------------- 18. SUBSCRIPTION LOGS ----------------
 function SubscriptionLogs() {
   const [logs, setLogs] = useState([]);

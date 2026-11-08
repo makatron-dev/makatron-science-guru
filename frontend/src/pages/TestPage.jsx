@@ -174,6 +174,42 @@ export default function TestPage() {
       return;
     }
 
+    // --- REVIEW MODE: hydrate directly from mk_review_pending, skip tripwire ---
+    const reviewPendingStr = sessionStorage.getItem("mk_review_pending");
+    if (reviewPendingStr) {
+      let cancelledReview = false;
+      try {
+        const pending = JSON.parse(reviewPendingStr);
+        sessionStorage.removeItem("mk_review_pending");
+        submittedRef.current = false;
+        abandonedRef.current = false;
+        tabSwitchesRef.current = 0;
+        answersRef.current = {};
+        questionTimesRef.current = {};
+        activeQuestionStartRef.current = null;
+        setTabSwitches(0);
+        setErr("");
+        setHintText("");
+        setHintCache({});
+        setTest(pending);
+        setSecondsLeft(pending.duration_seconds || 0);
+        // Register as the active test so heartbeat/abandon work
+        sessionStorage.setItem("mk_active_test", JSON.stringify({ testId: pending.test_id }));
+      } catch (e) {
+        sessionStorage.removeItem("mk_review_pending");
+        setErr("Could not load review. Please try again.");
+      }
+      return () => {
+        if (cancelledReview) return;
+        const t = testRef.current;
+        if (t && !submittedRef.current && !abandonedRef.current) {
+          abandonedRef.current = true;
+          api.abandonTest(t.test_id).catch(() => {});
+        }
+        sessionStorage.removeItem("mk_active_test");
+      };
+    }
+
     const completedExamKey = `mk-completed-exam-${subject}-${examId || 'general'}`;
     if (sessionStorage.getItem(completedExamKey)) {
       navigate("/dashboard", { replace: true });
@@ -196,9 +232,6 @@ export default function TestPage() {
       return;
     }
 
-    // FIX: tracks whether this effect run has been cleaned up (user left the
-    // page, or React re-ran the effect) so a late server response can never
-    // re-create the "active test" flag after the user is gone.
     let cancelled = false;
 
     submittedRef.current = false;
@@ -215,8 +248,6 @@ export default function TestPage() {
     api.startTest(subject, mode || "practice", examId ? parseInt(examId) : null)
       .then((d) => {
         if (cancelled) {
-          // The user already left this page: close the test that was just
-          // created on the server and do NOT set the refresh flag.
           api.abandonTest(d.test_id).catch(() => {});
           return;
         }
@@ -235,9 +266,6 @@ export default function TestPage() {
         abandonedRef.current = true;
         api.abandonTest(t.test_id).catch(() => {});
       }
-      // FIX: leaving the page normally (Back button, dashboard link, etc.)
-      // must clear the flag. A real browser refresh never runs this cleanup,
-      // so the refresh tripwire above still works.
       sessionStorage.removeItem("mk_active_test");
     };
   }, [subject, mode, examId, isNumeric, navigate]);
@@ -359,9 +387,8 @@ export default function TestPage() {
 
   async function getHint() {
     const q = test.questions[idx];
-    if (test.mode !== "practice") return; // Hints are PRACTICE ONLY
+    if (test.mode !== "practice") return;
 
-    // Use cached hint if we already fetched it for this question.
     if (hintCache[q.id]) {
       setHintText(hintCache[q.id]);
       return;
@@ -369,7 +396,6 @@ export default function TestPage() {
 
     setHintLoading(true);
     try {
-      // Send the CORRECT answer so the AI explains why it's correct.
       const correctText =
         q.options.find((o) => o.letter === q.correct_option)?.text ||
         q.correct_option ||
@@ -385,7 +411,6 @@ export default function TestPage() {
     }
   }
 
-  // Reset hint display when navigating to another question.
   useEffect(() => {
     if (!test) return;
     const q = test.questions[idx];
@@ -505,7 +530,7 @@ export default function TestPage() {
             <div className="card mk-test-question-card" style={{ padding: "40px" }}>
               
               {/* TOP: Question label + bookmark + report */}
-              <div style={{ flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <div style={{ flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 8 }}>
                 <span className="text-faint" style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase" }}>
                   Question {idx + 1} of {test.question_count}
                 </span>
@@ -556,8 +581,8 @@ export default function TestPage() {
                 </div>
               </div>
 
-              {/* MIDDLE: Question text & options (QuestionRenderer handles passage + image + Light Paper) */}
-              <div className="mk-test-question-text" style={{ flex: 1, overflowY: "auto" }}>
+              {/* MIDDLE: Question text & options (natural growth, no inner scroll) */}
+              <div className="mk-test-question-text">
                 <QuestionRenderer 
                   question={q} 
                   selectedOption={answers[q.id]} 
@@ -587,8 +612,8 @@ export default function TestPage() {
               </div>
             </div>
 
-            {/* NAV BUTTONS */}
-            <div className="row-between" style={{ flexShrink: 0, marginTop: 16 }}>
+            {/* NAV BUTTONS — always visible below question card */}
+            <div className="row-between mk-test-nav">
               <button className="secondary" disabled={idx === 0} onClick={() => setIdx(idx - 1)} style={{ padding: "12px 24px" }}>← Prev</button>
               {idx < test.question_count - 1 ? (
                 <button onClick={() => setIdx(idx + 1)} style={{ padding: "12px 24px" }}>Next →</button>
@@ -599,7 +624,7 @@ export default function TestPage() {
               )}
             </div>
 
-            <div className="mk-palette-mobile" style={{ marginTop: 16 }}>
+            <div className="mk-palette-mobile">
               <Palette />
             </div>
           </div>
@@ -612,106 +637,6 @@ export default function TestPage() {
         </div>
       </div>
 
-      {/* LAYOUT CSS */}
-      <style>{`
-        .mk-test-root {
-          background: var(--mk-bg);
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-          width: 100%;
-        }
-
-        .mk-test-header {
-          position: sticky;
-          top: 0;
-          z-index: 50;
-          flex-shrink: 0;
-          background: var(--mk-glass-bg-strong);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border-bottom: 1px solid var(--mk-border);
-          padding: 12px 16px;
-        }
-
-        .mk-test-main {
-          flex: 1;
-          padding: 16px;
-        }
-
-        .mk-test-layout {
-          max-width: 1600px;
-          margin: 0 auto;
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 16px;
-        }
-
-        .mk-test-question-col {
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .mk-test-question-card {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .mk-test-question-text {
-          margin-bottom: 24px;
-        }
-
-        .mk-palette-desktop {
-          display: none;
-        }
-
-        .mk-palette-mobile {
-          display: block;
-        }
-
-        @media (min-width: 1024px) {
-          .mk-test-root {
-            height: 100vh;
-            overflow: hidden;
-          }
-          .mk-test-main {
-            flex: 1;
-            overflow: hidden;
-            padding: 24px;
-          }
-          .mk-test-layout {
-            height: 100%;
-            grid-template-columns: 60% 1fr;
-            gap: 24px;
-          }
-          .mk-test-question-col {
-            height: 100%;
-            overflow: hidden;
-          }
-          .mk-test-question-card {
-            height: 100%;
-            overflow: hidden;
-          }
-          .mk-test-question-text {
-            flex: 1 1 auto;
-            overflow-y: auto;
-            margin-bottom: 24px;
-            padding-right: 8px;
-          }
-          .mk-palette-desktop {
-            display: block;
-            height: 100%;
-            overflow-y: auto;
-          }
-          .mk-palette-mobile {
-            display: none;
-          }
-          .mk-test-header {
-            padding: 12px 24px;
-          }
-        }
-      `}</style>
     </div>
   );
 }

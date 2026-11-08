@@ -205,7 +205,7 @@ export default function RegisterPage() {
             <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
                 <label>Full Name</label>
-                <input required value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} placeholder="e.g. John Doe" style={{ height: 48 }} />
+                <input required value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} placeholder="e.g. Ejiofor Chizobam" style={{ height: 48 }} />
               </div>
 
               {/* STATE & SCHOOL SELECTION */}

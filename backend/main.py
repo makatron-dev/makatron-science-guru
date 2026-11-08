@@ -20,6 +20,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from imagekitio import ImageKit
+import os
+
+imagekit = ImageKit(
+    private_key=os.getenv("IMAGEKIT_PRIVATE_KEY"),
+)
+
 from database import get_db, Base, engine
 import models
 import email_service
@@ -687,7 +694,11 @@ def heartbeat_test(test_id: int, payload: HeartbeatRequest, db: Session = Depend
 def submit_test(test_id: int, payload: SubmitTestRequest, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     test = db.query(models.Test).filter(models.Test.id == test_id, models.Test.user_id == user.id).first()
     if not test: raise HTTPException(404, "test not found")
-    if test.status != "in_progress": raise HTTPException(400, "test already submitted")
+    
+    # If the test was already submitted (e.g., auto-submit due to time or tab switch),
+    # return success so the frontend redirects to the result page instead of crashing.
+    if test.status != "in_progress": 
+        return {"ok": True, "test_id": test.id, "score": test.score, "already_submitted": True}
 
     if test.started_at and test.duration_seconds:
         elapsed = (datetime.now(timezone.utc) - test.started_at).total_seconds()
@@ -1250,6 +1261,7 @@ def admin_get_results(
         models.Test.submitted_at,
         models.User.display_name,
         models.User.school_name,
+        models.School.name.label("actual_school_name"),
         models.School.state
     ).join(
         models.User, models.Test.user_id == models.User.id
@@ -1277,10 +1289,14 @@ def admin_get_results(
     for r in results:
         # Calculate percentage safely
         pct = round((r.score / r.question_count) * 100, 1) if r.question_count > 0 else 0
+        
+        # PRIORITIZE the actual joined school name, then fallback to user's text, then "Independent"
+        final_school = r.actual_school_name or r.school_name or "Independent"
+        
         out.append({
             "id": r.id,
             "student_name": r.display_name,
-            "school_name": r.school_name or "Independent",
+            "school_name": final_school,
             "state": r.state or "—",
             "subject": r.subject,
             "mode": r.mode,
@@ -2121,7 +2137,11 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     if txn.plan_type != "monthly": return {"ok": True, "ignored": True}
     user = db.query(models.User).filter(models.User.id == txn.user_id).first()
     if not user: return {"ok": True, "ignored": True}
-    now = datetime.now(timezone.utc); expires = now + timedelta(days=30)
+    
+    now = datetime.now(timezone.utc)
+    base_date = user.premium_expires_at if (user.is_premium and user.premium_expires_at and user.premium_expires_at > now) else now
+    expires = base_date + timedelta(days=30)
+    
     txn.status = "success"; txn.paid_at = now; txn.expires_at = expires
     user.is_premium = True; user.premium_expires_at = expires
     db.commit()
@@ -2229,6 +2249,22 @@ def public_enquiry(payload: dict, background_tasks: BackgroundTasks, db: Session
     db.add(log); db.commit()
     return {"ok": True}
 
+@app.get("/admin/imagekit-auth")
+def get_imagekit_auth(current_user: User = Depends(get_current_user)):
+    # Ensure only admins can upload images
+    if not current_user.is_admin and current_user.role not in ["super_admin", "school_admin"]:
+        raise HTTPException(status_code=403, detail="Not authorized to upload images")
+    
+    try:
+        # Generate the secure upload token
+        auth_params = imagekit.helper.get_authentication_parameters()
+        
+        # CRITICAL: Manually attach the public key to the response
+        auth_params['publicKey'] = os.getenv("IMAGEKIT_PUBLIC_KEY")
+        
+        return auth_params
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/verify-certificate/{cert_id}")
 def verify_certificate(cert_id: str, db: Session = Depends(get_db)):

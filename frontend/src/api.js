@@ -84,6 +84,9 @@ export const api = {
   adminUpdateSettings: (p) => request("/admin/settings", { method: "PUT", body: p }),
   adminLogs: () => request("/admin/logs"),
   adminSubscriptionLogs: () => request("/admin/subscription-logs"),
+  
+  // ImageKit Secure Auth
+  getImageKitAuth: () => request("/admin/imagekit-auth"),
 
   // Schools (Admin)
   adminCreateSchool: (p) => request("/admin/schools", { method: "POST", body: p }),

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
 import PublicNav from "./PublicNav.jsx";
 import Logo from "./components/Logo.jsx";
+import BackButton from "./components/BackButton.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
 import TermsPage from "./pages/TermsPage.jsx";
@@ -47,18 +48,16 @@ function AppRoutes() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
-  
+
   const isAdminRoute = location.pathname.startsWith("/admin");
-  
-  // FIXED: Added "/subscription" so it opens as a clean full-width page
-  const isFullWidthRoute = 
-    location.pathname === "/" || 
-    location.pathname === "/login" || 
+
+  const isFullWidthRoute =
+    location.pathname === "/" ||
+    location.pathname === "/login" ||
     location.pathname === "/register" ||
     location.pathname === "/terms" ||
     location.pathname === "/forgot-password" ||
     location.pathname === "/reset-password" ||
-    location.pathname === "/subscription" ||
     location.pathname.startsWith("/test/");
 
   if (isAdminRoute) {
@@ -98,6 +97,11 @@ function AppRoutes() {
         {mobileOpen && <div className="public-overlay" onClick={() => setMobileOpen(false)}></div>}
 
         <main className="public-main">
+          {/* Global in-app back button. Auto-hidden on /dashboard. */}
+          <div className="container" style={{ paddingTop: 16 }}>
+            <BackButton />
+          </div>
+
           <Routes>
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/zoom" element={<ZoomPage />} />
@@ -112,10 +116,8 @@ function AppRoutes() {
             <Route path="/library" element={<Protected><LibraryPage /></Protected>} />
             <Route path="/collection" element={<Protected><CollectionPage /></Protected>} />
             <Route path="/upgrade" element={<Protected><UpgradePage /></Protected>} />
-            
-            {/* Added here just in case you ever want it with the sidebar layout */}
             <Route path="/subscription" element={<Protected><SubscriptionPage /></Protected>} />
-            
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
