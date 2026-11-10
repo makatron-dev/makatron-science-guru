@@ -1014,8 +1014,8 @@ export default function DashboardPage() {
               <span style={{ fontSize: "0.7rem", background: "rgba(34, 217, 154, 0.15)", color: "var(--mk-success)", padding: "4px 10px", borderRadius: 20, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Unlimited</span>
             </div>
             <p className="text-dim" style={{ margin: "0 0 24px 0", fontSize: "0.95rem" }}>Sharpen your skills with unlimited practice sessions. No pressure, no limits.</p>
-            {practiceExams.length > 0 && (
-              <div className="exam-grid" style={{ marginBottom: 24 }}>
+            {practiceExams.length > 0 ? (
+              <div className="exam-grid">
                 {practiceExams.map((ex) => (
                   <div key={ex.id} className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", borderTop: "4px solid var(--mk-success)" }}>
                     <div>
@@ -1027,15 +1027,12 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
+            ) : (
+              <div className="card" style={{ textAlign: "center", padding: 40, borderStyle: "dashed" }}>
+                <div style={{ fontSize: "2.5rem", marginBottom: 12 }}>🎯</div>
+                <p className="text-dim" style={{ margin: 0 }}>No active practice exams right now. Check back later.</p>
+              </div>
             )}
-            <div className="exam-grid">
-              {user.subjects.map((s) => (
-                <div key={s} className="card" style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-                  <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--mk-text)" }}>{SUBJECT_LABELS[s]}</div>
-                  <Link to={"/test/" + s + "/practice"} style={{ width: "100%" }}><button className="secondary" style={{ width: "100%", display: "flex", justifyContent: "space-between" }}><span>Practice {SUBJECT_LABELS[s]}</span><span style={{ opacity: 0.7 }}>Unlimited</span></button></Link>
-                </div>
-              ))}
-            </div>
           </div>
           <div style={{ marginTop: 48 }}>
             <Link to="/arena" style={{ textDecoration: "none" }}>

@@ -1002,33 +1002,20 @@ function StudentsCenter({ onRefresh }) {
     else setSelectedIds(students.map(s => s.id));
   }
 
-  async function bulkDelete() {
+    async function bulkDelete() {
     if (!window.confirm(`Are you absolutely sure you want to delete ${selectedIds.length} students? This will also delete all their test history. This cannot be undone.`)) return;
     setBusy(true);
     try {
-      const token = getToken();
-      const res = await fetch(`${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/admin/students/bulk-delete`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + token
-        },
-        body: JSON.stringify({ user_ids: selectedIds })
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || "Bulk delete failed");
-      }
-      
+      await api.adminBulkDeleteStudents(selectedIds);
       setSelectedIds([]);
       load();
       if (onRefresh) onRefresh();
+      alert("Students deleted successfully.");
     } catch (err) {
       alert("Bulk delete failed: " + err.message);
     }
     setBusy(false);
   }
-
   return (
     <div>
       <div className="row-between" style={{ marginBottom: 24 }}>

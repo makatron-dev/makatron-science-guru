@@ -1,25 +1,83 @@
 export const EDUCATION_LEVELS = ["primary", "junior", "senior"];
 
+export const SENIOR_TRACKS = ["science", "humanities_business"];
+
+export const SENIOR_CORE_SUBJECTS = [
+  "mathematics",
+  "english",
+  "digital_technologies",
+  "citizenship_heritage",
+];
+
+export const SENIOR_TRACK_SUBJECTS = {
+  science: [
+    "chemistry",
+    "physics",
+    "biology",
+    "agricultural_science",
+    "further_mathematics",
+  ],
+  humanities_business: [
+    "economics",
+    "government",
+    "literature",
+    "history",
+    "crs_irs",
+  ],
+};
+
 export const SUBJECTS_BY_LEVEL = {
-  primary: ["general_science"],
-  junior: ["intermediate_science", "biology", "chemistry", "physics"],
-  senior: ["biology", "chemistry", "physics"],
+  primary: ["mathematics", "english", "general_science"],
+  junior: [
+    "mathematics",
+    "english",
+    "intermediate_science",
+    "biology",
+    "chemistry",
+    "physics",
+    "citizenship_heritage",
+  ],
+  senior: [
+    ...SENIOR_CORE_SUBJECTS,
+    ...SENIOR_TRACK_SUBJECTS.science,
+    ...SENIOR_TRACK_SUBJECTS.humanities_business,
+  ],
 };
 
 export const EXAM_TARGETS_BY_LEVEL = {
-  primary: ["primary_school"],
-  junior: ["junior_school", "bece", "IGCSE"],
-  senior: ["senior_school", "waec", "jamb", "IGCSE"],
+  primary: ["common_entrance"],
+  junior: ["bece", "IGCSE"],
+  senior: ["jamb", "waec", "neco", "gce", "IGCSE", "ssce"],
 };
 
-export const ALL_EXAM_TARGETS = ["primary_school", "junior_school", "bece", "senior_school", "waec", "jamb", "IGCSE"];
+export const ALL_EXAM_TARGETS = [
+  "common_entrance",
+  "bece",
+  "IGCSE",
+  "jamb",
+  "waec",
+  "neco",
+  "gce",
+  "ssce",
+];
 
 export const SUBJECT_LABELS = {
+  mathematics: "Mathematics",
+  english: "English",
   general_science: "General Science",
   intermediate_science: "Intermediate Science",
   biology: "Biology",
   chemistry: "Chemistry",
   physics: "Physics",
+  agricultural_science: "Agricultural Science",
+  further_mathematics: "Further Mathematics",
+  economics: "Economics",
+  government: "Government",
+  literature: "Literature",
+  history: "History",
+  crs_irs: "CRS / IRS",
+  digital_technologies: "Digital Technologies",
+  citizenship_heritage: "Citizenship & Heritage Studies",
   mixed: "Mixed Subjects",
 };
 
@@ -29,33 +87,45 @@ export const LEVEL_LABELS = {
   senior: "Senior Secondary",
 };
 
-export const EXAM_TARGET_LABELS = {
-  primary_school: "Primary School Exams",
-  junior_school: "Junior School Exams",
-  bece: "BECE",
-  senior_school: "Senior School Exams",
-  waec: "WAEC",
-  jamb: "JAMB",
-  IGCSE: "IGCSE",
+export const SENIOR_TRACK_LABELS = {
+  science: "Science",
+  humanities_business: "Humanities / Business",
 };
 
-export const ALL_SUBJECTS = ["general_science", "intermediate_science", "biology", "chemistry", "physics"];
+export const EXAM_TARGET_LABELS = {
+  common_entrance: "Common Entrance",
+  bece: "BECE",
+  IGCSE: "IGCSE",
+  jamb: "JAMB",
+  waec: "WAEC",
+  neco: "NECO",
+  gce: "GCE",
+  ssce: "SSCE",
+};
+
+export const ALL_SUBJECTS = [
+  "mathematics",
+  "english",
+  "general_science",
+  "intermediate_science",
+  "biology",
+  "chemistry",
+  "physics",
+  "agricultural_science",
+  "further_mathematics",
+  "economics",
+  "government",
+  "literature",
+  "history",
+  "crs_irs",
+  "digital_technologies",
+  "citizenship_heritage",
+  "mixed",
+];
 
 // ==========================================
 // LIGHT PAPER RENDER MODES
 // ==========================================
-// Question cards flip to "Light Paper" mode when the question has an image
-// or a passage attached. These exports give the renderer a single source of
-// truth instead of scattering the literal string "light_paper" everywhere.
-//
-// Usage in a component:
-//   import { IMAGE_RENDER_MODES, questionNeedsLightPaper } from "../constants";
-//   const mode = questionNeedsLightPaper(q) ? IMAGE_RENDER_MODES.LIGHT_PAPER : IMAGE_RENDER_MODES.DARK;
-//
-// "DARK" mode is the default glass-morphism card styling.
-// "LIGHT_PAPER" mode is the off-white, dark-text card used for questions
-// with an image or a comprehension passage.
-
 export const IMAGE_RENDER_MODES = {
   DARK: "dark",
   LIGHT_PAPER: "light_paper",

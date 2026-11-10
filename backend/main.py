@@ -1412,15 +1412,25 @@ def admin_delete_exam(exam_id: int, db: Session = Depends(get_db), admin: models
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not exam: raise HTTPException(404, "Exam not found")
     exam_title = exam.title
-    test_ids = [t.id for t in db.query(models.Test.id).filter(models.Test.exam_id == exam_id).all()]
-    if test_ids:
-        db.query(models.TestAnswer).filter(models.TestAnswer.test_id.in_(test_ids)).delete(synchronize_session=False)
-    db.query(models.Test).filter(models.Test.exam_id == exam_id).delete(synchronize_session=False)
-    db.query(models.HallOfFame).filter(models.HallOfFame.exam_id == exam_id).delete(synchronize_session=False)
-    db.query(models.Question).filter(models.Question.exam_id == exam_id).delete(synchronize_session=False)
-    db.delete(exam); db.commit()
-    log_activity(db, "EXAM_DELETED", f"Admin deleted exam: {exam_title}")
-    return {"ok": True}
+    
+    try:
+        test_ids = [t.id for t in db.query(models.Test.id).filter(models.Test.exam_id == exam_id).all()]
+        if test_ids:
+            db.query(models.TestAnswer).filter(models.TestAnswer.test_id.in_(test_ids)).delete(synchronize_session=False)
+        
+        db.query(models.Test).filter(models.Test.exam_id == exam_id).delete(synchronize_session=False)
+        db.query(models.HallOfFame).filter(models.HallOfFame.exam_id == exam_id).delete(synchronize_session=False)
+        
+        # Unlink questions instead of deleting them if they were uploaded to the general bank
+        db.query(models.Question).filter(models.Question.exam_id == exam_id).update({"exam_id": None}, synchronize_session=False)
+        
+        db.delete(exam)
+        db.commit()
+        log_activity(db, "EXAM_DELETED", f"Admin deleted exam: {exam_title}")
+        return {"ok": True}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Database deletion failed: {str(e)}")
 
 
 @app.put("/admin/exams/{exam_id}/toggle")
@@ -1704,50 +1714,48 @@ def admin_update_user_role(user_id: int, payload: RoleUpdateRequest, db: Session
     return {"ok": True, "role": target.role, "school_id": target.school_id}
 
 
-# FIX: Changed to POST so the browser doesn't block the request body
 @app.post("/admin/students/bulk-delete")
 def admin_bulk_delete_students(payload: dict, db: Session = Depends(get_db), admin: models.User = Depends(require_super_admin)):
     user_ids = payload.get("user_ids", [])
     if not user_ids: return {"ok": True, "deleted": 0}
     
-    for uid in user_ids:
-        # 1. Delete Test Answers
-        test_ids_subq = db.query(models.Test.id).filter(models.Test.user_id == uid).subquery()
-        db.query(models.TestAnswer).filter(models.TestAnswer.test_id.in_(test_ids_subq)).delete(synchronize_session=False)
-        
-        # 2. Delete Tests
-        db.query(models.Test).filter(models.Test.user_id == uid).delete(synchronize_session=False)
-        
-        # 3. Delete Bookmarks
-        db.query(models.QuestionBookmark).filter(models.QuestionBookmark.user_id == uid).delete(synchronize_session=False)
-        
-        # 4. Delete Emails
-        db.query(models.EmailLog).filter(models.EmailLog.user_id == uid).delete(synchronize_session=False)
-        
-        # 5. Delete Daily Challenge Logs (This caused the crash!)
-        db.query(models.DailyChallengeLog).filter(models.DailyChallengeLog.user_id == uid).delete(synchronize_session=False)
-        
-        # 6. Delete Reported Questions made by the user
-        db.query(models.ReportedQuestion).filter(models.ReportedQuestion.user_id == uid).delete(synchronize_session=False)
-        
-        # 7. Delete Inventory (Vault items)
-        db.query(models.UserInventory).filter(models.UserInventory.user_id == uid).delete(synchronize_session=False)
-        
-        # 8. Delete Study Sessions
-        db.query(models.StudySession).filter(models.StudySession.user_id == uid).delete(synchronize_session=False)
-        
-        # 9. Delete Squad Membership
-        db.query(models.SquadMember).filter(models.SquadMember.user_id == uid).delete(synchronize_session=False)
-        
-        # 10. Finally, Delete the User
-        db.query(models.User).filter(models.User.id == uid).delete(synchronize_session=False)
-        
-    db.commit()
-    log_activity(db, "STUDENTS_BULK_DELETED", f"Admin deleted {len(user_ids)} students")
-    return {"ok": True, "deleted": len(user_ids)}
-
-
-@app.get("/admin/students/{user_id}")
+    try:
+        for uid in user_ids:
+            # 1. Delete all Test Answers linked to the user's tests
+            test_ids = [t.id for t in db.query(models.Test.id).filter(models.Test.user_id == uid).all()]
+            if test_ids:
+                db.query(models.TestAnswer).filter(models.TestAnswer.test_id.in_(test_ids)).delete(synchronize_session=False)
+            
+            # 2. Delete the Tests themselves
+            db.query(models.Test).filter(models.Test.user_id == uid).delete(synchronize_session=False)
+            
+            # 3. Delete Squad records created by this user, and their memberships
+            db.query(models.SquadMember).filter(models.SquadMember.user_id == uid).delete(synchronize_session=False)
+            my_squads = db.query(models.Squad.id).filter(models.Squad.creator_id == uid).all()
+            squad_ids = [s.id for s in my_squads]
+            if squad_ids:
+                db.query(models.SquadMember).filter(models.SquadMember.squad_id.in_(squad_ids)).delete(synchronize_session=False)
+            db.query(models.Squad).filter(models.Squad.creator_id == uid).delete(synchronize_session=False)
+            
+            # 4. Delete all other user-linked data
+            db.query(models.Transaction).filter(models.Transaction.user_id == uid).delete(synchronize_session=False)
+            db.query(models.HallOfFame).filter(models.HallOfFame.user_id == uid).delete(synchronize_session=False)
+            db.query(models.QuestionBookmark).filter(models.QuestionBookmark.user_id == uid).delete(synchronize_session=False)
+            db.query(models.EmailLog).filter(models.EmailLog.user_id == uid).delete(synchronize_session=False)
+            db.query(models.DailyChallengeLog).filter(models.DailyChallengeLog.user_id == uid).delete(synchronize_session=False)
+            db.query(models.ReportedQuestion).filter(models.ReportedQuestion.user_id == uid).delete(synchronize_session=False)
+            db.query(models.UserInventory).filter(models.UserInventory.user_id == uid).delete(synchronize_session=False)
+            db.query(models.StudySession).filter(models.StudySession.user_id == uid).delete(synchronize_session=False)
+            
+            # 5. Finally, Delete the User
+            db.query(models.User).filter(models.User.id == uid).delete(synchronize_session=False)
+            
+        db.commit()
+        log_activity(db, "STUDENTS_BULK_DELETED", f"Admin deleted {len(user_ids)} students")
+        return {"ok": True, "deleted": len(user_ids)}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Database deletion failed: {str(e)}")@app.get("/admin/students/{user_id}")
 def admin_student_profile(user_id: int, db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
     s = _scoped_user_or_403(db, admin, user_id)
     tests = db.query(models.Test).filter(models.Test.user_id == s.id).order_by(models.Test.started_at.desc()).all()
