@@ -638,9 +638,24 @@ def start_test(payload: StartTestRequest, db: Session = Depends(get_db), user: m
         if exam.access_code and payload.access_code != exam.access_code: raise HTTPException(403, "Invalid access code.")
         if exam.exam_type == "championship": require_premium(user)
         elif exam.exam_type == "mock": check_trial_access(user)
-        if exam.exam_type in ("mock", "championship"):
+        
+        if exam.exam_type == "championship":
             attempted = db.query(models.Test).filter(models.Test.user_id == user.id, models.Test.exam_id == exam.id, models.Test.status == "submitted").first()
-            if attempted: raise HTTPException(403, f"You have already attempted this {exam.exam_type}. No retakes allowed.")
+            if attempted: raise HTTPException(403, "You have already attempted this championship. No retakes allowed.")
+            
+        elif exam.exam_type == "mock":
+            # MOCK EXAM POOL RULE: Max 3 attempts per 7 days
+            seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+            recent_attempts = db.query(models.Test).filter(
+                models.Test.user_id == user.id,
+                models.Test.exam_id == exam.id,
+                models.Test.status == "submitted",
+                models.Test.submitted_at >= seven_days_ago
+            ).count()
+            
+            if recent_attempts >= 3:
+                raise HTTPException(403, "You have used all 3 attempts for this mock exam in the last 7 days. Please try again next week.")
+
         pool = db.query(models.Question).filter(models.Question.exam_id == exam.id, models.Question.is_active == True).all()
         if len(pool) == 0: raise HTTPException(400, "No questions found for this exam.")
         serve_count = exam.questions_to_serve if exam.questions_to_serve > 0 else len(pool)
@@ -1890,6 +1905,66 @@ def explain_question(payload: dict, db: Session = Depends(get_db), current_user:
 @app.get("/subjects/mine")
 def my_subjects(user: models.User = Depends(get_current_user)):
     return {"education_level": user.education_level, "exam_target": user.exam_target, "subjects": user.subjects}
+
+
+@app.get("/subjects/{subject}/topics")
+def get_subject_topics(subject: str, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+    """Fetch unique topics for a subject from the question bank."""
+    topics = db.query(models.Question.topic).filter(
+        models.Question.subject == subject,
+        models.Question.education_level == user.education_level,
+        models.Question.is_active == True,
+        models.Question.topic != None,
+        models.Question.topic != ""
+    ).distinct().all()
+    
+    # Return a clean list of strings
+    return [t[0] for t in topics if t[0]]
+
+
+@app.get("/subjects/{subject}/topics")
+def get_subject_topics(subject: str, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+    """Fetch unique topics for a subject from the question bank."""
+    topics = db.query(models.Question.topic).filter(
+        models.Question.subject == subject,
+        models.Question.education_level == user.education_level,
+        models.Question.is_active == True,
+        models.Question.topic != None,
+        models.Question.topic != ""
+    ).distinct().all()
+    
+    # Return a clean list of strings
+    return [t[0] for t in topics if t[0]]
+
+
+@app.get("/subjects/{subject}/topics")
+def get_subject_topics(subject: str, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+    """Fetch unique topics for a subject from the question bank."""
+    topics = db.query(models.Question.topic).filter(
+        models.Question.subject == subject,
+        models.Question.education_level == user.education_level,
+        models.Question.is_active == True,
+        models.Question.topic != None,
+        models.Question.topic != ""
+    ).distinct().all()
+    
+    # Return a clean list of strings
+    return [t[0] for t in topics if t[0]]
+
+
+@app.get("/subjects/{subject}/topics")
+def get_subject_topics(subject: str, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+    """Fetch unique topics for a subject from the question bank."""
+    topics = db.query(models.Question.topic).filter(
+        models.Question.subject == subject,
+        models.Question.education_level == user.education_level,
+        models.Question.is_active == True,
+        models.Question.topic != None,
+        models.Question.topic != ""
+    ).distinct().all()
+    
+    # Return a clean list of strings
+    return [t[0] for t in topics if t[0]]
 
 
 # ---------------- DAILY CHALLENGE ----------------
