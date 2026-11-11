@@ -2,7 +2,7 @@
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../AuthContext.jsx";
 import { api } from "../api.js";
-import { EDUCATION_LEVELS, LEVEL_LABELS } from "../constants.js";
+import { EDUCATION_LEVELS, LEVEL_LABELS, SENIOR_TRACKS, SENIOR_TRACK_LABELS, SENIOR_CORE_SUBJECTS, SENIOR_TRACK_SUBJECTS } from "../constants.js";
 import Logo from "../components/Logo.jsx";
 
 export default function RegisterPage() {
@@ -19,6 +19,8 @@ export default function RegisterPage() {
     password: "",
     education_level: "senior"
   });
+
+  const [seniorTrack, setSeniorTrack] = useState("science"); // "science" or "humanities_business"
   
   const [schools, setSchools] = useState([]);
   const [selectedState, setSelectedState] = useState("");
@@ -68,7 +70,21 @@ export default function RegisterPage() {
         throw new Error("Please select or enter your school.");
       }
 
-      const res = await register({ ...payload, exam_target: "jamb", subjects: [] });
+      let assignedTarget = "jamb";
+      let assignedSubjects = [];
+
+      if (payload.education_level === "primary") {
+        assignedTarget = "common_entrance";
+        assignedSubjects = ["mathematics", "english", "general_science"];
+      } else if (payload.education_level === "junior") {
+        assignedTarget = "bece";
+        assignedSubjects = ["mathematics", "english", "intermediate_science", "biology", "chemistry", "physics", "citizenship_heritage"];
+      } else if (payload.education_level === "senior") {
+        assignedTarget = "waec";
+        assignedSubjects = [...SENIOR_CORE_SUBJECTS, ...SENIOR_TRACK_SUBJECTS[seniorTrack]];
+      }
+
+      const res = await register({ ...payload, exam_target: assignedTarget, subjects: assignedSubjects });
       
       alert(`Registration Successful!\n\nYour Username is: ${res.recovery_username}\n\nPlease save this. You will need it to log in.`);
       navigate("/dashboard");
@@ -316,6 +332,33 @@ export default function RegisterPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Senior Track Selection */}
+              {form.education_level === "senior" && (
+                <div style={{ marginTop: 8, padding: "16px", background: "var(--mk-bg-elev)", border: "1px solid var(--mk-border-strong)", borderRadius: "var(--mk-radius)" }}>
+                  <label style={{ marginBottom: 12, display: "block" }}>Select Your Track</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    {SENIOR_TRACKS.map(track => (
+                      <button
+                        type="button"
+                        key={track}
+                        onClick={() => setSeniorTrack(track)}
+                        style={{
+                          padding: "12px 8px",
+                          fontSize: "0.85rem",
+                          background: seniorTrack === track ? "var(--mk-brand-secondary)" : "var(--mk-bg)",
+                          color: seniorTrack === track ? "#fff" : "var(--mk-text-dim)",
+                          border: `1px solid ${seniorTrack === track ? "var(--mk-brand-secondary)" : "var(--mk-border-strong)"}`,
+                          borderRadius: "var(--mk-radius)",
+                          fontWeight: 700
+                        }}
+                      >
+                        {SENIOR_TRACK_LABELS[track]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label>Email <span style={{ color: "var(--mk-text-faint)", fontWeight: 600, textTransform: "none" }}>(Optional)</span></label>
